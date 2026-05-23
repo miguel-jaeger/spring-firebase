@@ -1,16 +1,14 @@
 package com.firebase.app.config;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.firestore.Firestore;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
-import com.google.cloud.firestore.Firestore;
 import com.google.firebase.cloud.FirestoreClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
-
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 
 @Configuration
 public class FirebaseConfig {
@@ -18,31 +16,33 @@ public class FirebaseConfig {
     @Bean
     public Firestore getFirestore() {
         try {
-            // 1. Verificamos si Firebase ya fue inicializado (evita errores con herramientas como DevTools)
-            if (FirebaseApp.getApps().isEmpty()) {
-                
-                // 2. Leemos el archivo JSON desde la carpeta resources
-                InputStream serviceAccount = new ClassPathResource("firebase-service-account.json").getInputStream();
+            // 1. Intentar leer la variable de entorno de Render
+            String firebaseJson = System.getenv("FIREBASE_CREDENTIALS");
+            GoogleCredentials credentials;
 
-                // 3. Configuramos las credenciales
-                FirebaseOptions options = FirebaseOptions.builder()
-                        .setCredentials(GoogleCredentials.fromStream(serviceAccount))
-                        .build();
-
-                // 4. Inicializamos la aplicación de Firebase de forma prioritaria
-                FirebaseApp.initializeApp(options);
-                
-                System.out.println("=========================================");
-                System.out.println("¡CONEXIÓN EN ORDEN: FIREBASE CONFIGURADO!");
-                System.out.println("=========================================");
+            if (firebaseJson != null && !firebaseJson.trim().isEmpty()) {
+                // Si existe la variable (Producción en Render), la procesamos como un Stream de texto
+                credentials = GoogleCredentials.fromStream(
+                    new ByteArrayInputStream(firebaseJson.getBytes(StandardCharsets.UTF_8))
+                );
+            } else {
+                // Fallback para cuando estés desarrollando localmente con el archivo físico
+                var resource = new org.springframework.core.io.ClassPathResource("firebase-service-account.json");
+                credentials = GoogleCredentials.fromStream(resource.getInputStream());
             }
-            
-            // 5. Ahora que sabemos que la App existe, devolvemos el cliente de Firestore a salvo
+
+            // 2. Inicializar FirebaseApp si no ha sido inicializada antes
+            if (FirebaseApp.getApps().isEmpty()) {
+                FirebaseOptions options = FirebaseOptions.builder()
+                        .setCredentials(credentials)
+                        .build();
+                FirebaseApp.initializeApp(options);
+            }
+
             return FirestoreClient.getFirestore();
 
-        } catch (IOException e) {
-            System.err.println("Error catastrófico al leer el archivo de credenciales de Firebase: " + e.getMessage());
-            throw new RuntimeException("No se pudo iniciar Firestore debido a un error de credenciales.", e);
+        } catch (Exception e) {
+            throw new RuntimeException("No se pudo iniciar Firestore debido a un error de credenciales: " + e.getMessage(), e);
         }
     }
 }
