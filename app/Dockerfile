@@ -18,4 +18,4 @@ COPY --from=build /app/target/*.jar app.jar
 # Copiar archivo de base de datos SQLite al contenedor
 #COPY autenticar/db/usuarios.db /app/autenticar/db/usuarios.db
 
-CMD ["sh","-c","java -Dserver.port=${PORT:-4002} -jar /app/autenticar/app.jar"]
+CMD ["sh","-c","java -Dserver.port=${PORT:-4002} -jar /app/app.jar"]
