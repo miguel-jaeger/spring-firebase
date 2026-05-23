@@ -1,20 +1,27 @@
-# Etapa 1: Compilar la aplicación
+# =========================================================
+# Etapa 1: Compilar la aplicación (Build Stage)
+# =========================================================
 FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
 
-# Copia el pom y el código fuente (asumiendo que el Dockerfile está al mismo nivel que el pom.xml)
+# 1. Copiar los archivos de configuración de Maven
 COPY pom.xml .
+
+# 2. Copiar el código fuente de la aplicación
 COPY src ./src
 
-# Construir proyecto saltando pruebas
+# 3. Compilar y empaquetar el JAR (saltando los tests para acelerar el despliegue)
 RUN mvn -B -DskipTests=true clean package
 
-# Etapa 2: Imagen de ejecución ligera
+# =========================================================
+# Etapa 2: Imagen ligera de ejecución (Runtime Stage)
+# =========================================================
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-# Copiar el archivo jar compilado desde la etapa anterior
+# 4. Copiar el archivo JAR generado desde la etapa de compilación
 COPY --from=build /app/target/*.jar app.jar
 
-# Ejecutar la aplicación mapeando el puerto dinámico de Render
-CMD ["sh", "-c", "java -Dserver.port=${PORT:-4002} -jar /app/app.jar"]
+# 5. Comando de inicio limpio. 
+# Delegamos la configuración del puerto a las variables de entorno de Render
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
